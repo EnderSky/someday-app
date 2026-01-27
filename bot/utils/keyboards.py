@@ -62,7 +62,7 @@ def get_task_keyboard(task_id: str, category: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(buttons)
 
 
-def get_task_list_keyboard(tasks: list, category: str, counts: Optional[dict] = None) -> InlineKeyboardMarkup:
+def get_task_list_keyboard(tasks: list, category: str, counts: Optional[dict] = None, limit: Optional[int] = None) -> InlineKeyboardMarkup:
     """Get keyboard with compact numbered buttons for task selection."""
     counts = counts or {}
     buttons = []
@@ -84,7 +84,13 @@ def get_task_list_keyboard(tasks: list, category: str, counts: Optional[dict] = 
     
     # Navigation buttons with counts
     if category == "now":
-        buttons.append([InlineKeyboardButton("🔀 Shuffle Tasks Shown", callback_data="shuffle")])
+        # Only show shuffle when not all NOW tasks are displayed
+        total_now = counts.get("now", len(tasks))
+        should_show_shuffle = limit and len(tasks) < total_now
+        
+        if should_show_shuffle:
+            buttons.append([InlineKeyboardButton("🔀 Shuffle Tasks Shown", callback_data="shuffle")])
+        
         buttons.append([
             InlineKeyboardButton(f"⏳ Soon ({soon_count})", callback_data="view_soon"),
             InlineKeyboardButton(f"📦 Someday ({someday_count})", callback_data="view_someday"),

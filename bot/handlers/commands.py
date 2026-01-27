@@ -13,10 +13,12 @@ WELCOME_MESSAGE = """🎯 Someday
 
 Your ADHD-friendly task manager.
 
-HOW IT WORKS
-Just send me any message — it becomes a task.
-Move important tasks to Soon or Now.
-I show only a few NOW tasks to keep you focused.
+How it works:
+• Just send me any message to add a task
+• Edit messages to update tasks
+• Tasks go to Someday by default
+• Move important tasks to Soon or Now
+• I show only a few NOW tasks to keep you focused
 
 COMMANDS
 /now · View your tasks

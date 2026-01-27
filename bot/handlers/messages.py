@@ -41,8 +41,9 @@ async def handle_new_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
     counts = get_task_counts(user["id"])
     
     # Send confirmation
+    task_text = "task" if counts["someday"] == 1 else "tasks"
     await update.message.reply_text(
-        f"✓ Added to someday · {counts['someday']} tasks"
+        f"✓ Added to someday ({counts['someday']} {task_text})"
     )
 
 

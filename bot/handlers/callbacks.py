@@ -97,7 +97,7 @@ async def show_category_view(query, user: dict, category: str, shuffle: bool = F
     
     message, parse_mode = format_task_list(display_tasks, category, counts, limit=limit, theme=theme)
     # keyboard = get_main_keyboard(category)
-    keyboard = get_task_list_keyboard(display_tasks, category, counts=counts)
+    keyboard = get_task_list_keyboard(display_tasks, category, counts=counts, limit=limit)
     
     await query.edit_message_text(message, reply_markup=keyboard, parse_mode=parse_mode)
 

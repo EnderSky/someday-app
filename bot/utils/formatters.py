@@ -268,11 +268,11 @@ def _format_task_list_classic(tasks: list, category: str, counts: dict, limit: O
         if remaining > 0:
             lines.extend([CLASSIC_SIDE, f"{CLASSIC_SIDE} +{remaining} more"])
         lines.append(CLASSIC_SIDE)
+        
+        if tasks:
+            lines.extend([CLASSIC_SIDE + " " + TEXT_SELECT_TASKS])
     
     lines.append(CLASSIC_BOT)
-    
-    if tasks:
-        lines.extend(["", TEXT_SELECT_TASKS])
     
     return "\n".join(lines)
 
@@ -486,7 +486,7 @@ def _format_task_list_monospace(tasks: list, category: str, counts: dict, limit:
     lines.extend([_mono_box_bot(), "```"])
     
     if tasks:
-        lines.extend(["", TEXT_SELECT_TASKS])
+        lines.extend([TEXT_SELECT_TASKS])
     
     return "\n".join(lines)
 
