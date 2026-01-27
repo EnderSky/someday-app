@@ -106,6 +106,12 @@ CREATE TABLE users (
   }',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Row Level Security (kept enabled for future web app)
+-- Bot uses service_role key which bypasses RLS
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can access own record" ON users
+  FOR ALL USING (id = auth.uid());
 ```
 
 ### Tasks Table
@@ -131,7 +137,8 @@ CREATE INDEX idx_tasks_user_active ON tasks(user_id)
 CREATE INDEX idx_tasks_message_id ON tasks(user_id, telegram_message_id)
   WHERE completed_at IS NULL;
 
--- Row Level Security
+-- Row Level Security (kept enabled for future web app)
+-- Bot uses service_role key which bypasses RLS
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can only access their own tasks" ON tasks
   FOR ALL USING (user_id = auth.uid());
@@ -216,9 +223,12 @@ Edit your original message to update the task content. The bot silently updates 
 1. Finish tax documents
 2. Call dentist
 3. Reply to landlord email
+
+Tap a number to select task.
 ─────────────────────
 ⏳ Soon: 12  |  📦 Someday: 43
 
+[1] [2] [3]
 [🔀 Shuffle]
 [⏳ Soon] [📦 Someday]
 [⚙️ Settings]
@@ -233,9 +243,12 @@ Edit your original message to update the task content. The bot silently updates 
 2. Research new laptop
 3. Schedule annual checkup
 ... and 9 more
+
+Tap a number to select task.
 ─────────────────────
 🔥 Now: 7  |  📦 Someday: 43
 
+[1] [2] [3] [4] [5]
 [🔥 Now] [📦 Someday]
 [⚙️ Settings]
 ```
@@ -249,9 +262,12 @@ Edit your original message to update the task content. The bot silently updates 
 2. Organize garage
 3. Read that book Sarah recommended
 ... and 40 more
+
+Tap a number to select task.
 ─────────────────────
 🔥 Now: 7  |  ⏳ Soon: 12
 
+[1] [2] [3] [4] [5]
 [🔥 Now] [⏳ Soon]
 [⚙️ Settings]
 ```
@@ -281,9 +297,11 @@ Added 3 days ago
 ─────────────────────
 NOW display limit: 3
 
-[3] [5] [7]
+[1] [2] [3] [4] [5]
 [← Back]
 ```
+
+Note: Values are capped to 1-5 range.
 
 ### Completion Behavior
 
@@ -371,8 +389,9 @@ CMD ["python", "-m", "bot.main"]
 # .env.example
 TELEGRAM_BOT_TOKEN=your_bot_token
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your_anon_key
+SUPABASE_KEY=your_service_role_key  # Use service_role key (bypasses RLS)
 WEBHOOK_URL=https://someday-app.fly.dev/webhook
+ENV=development  # or production
 # Future
 GROQ_API_KEY=your_groq_key
 ```

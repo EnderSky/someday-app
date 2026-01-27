@@ -45,7 +45,10 @@ Someday App is a minimalist task management bot designed to reduce overwhelm and
    ```bash
    pip install -r requirements.txt
    ```
-4. Copy `.env.example` to `.env` and fill in your credentials
+4. Copy `.env.example` to `.env` and fill in your credentials: 
+   ```
+   copy .env.example .env
+   ```
 5. Run the bot:
    ```bash
    python -m bot.main
