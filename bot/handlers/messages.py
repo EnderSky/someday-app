@@ -8,6 +8,7 @@ from bot.services.task_service import (
     get_task_by_message_id,
     update_task_content,
     get_task_counts,
+    update_task_category,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,16 @@ async def handle_new_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not content:
         return
     
+    # Check for special tags to determine category
+    # Special tags can be !now or !soon at the start or end of the message
+    category = "someday"
+    if content.lower().startswith("!now") or content.lower().endswith("!now"):
+        category = "now"
+        content = content.replace("!now", "").strip()
+    elif content.lower().startswith("!soon") or content.lower().endswith("!soon"):
+        category = "soon"
+        content = content.replace("!soon", "").strip()
+    
     # Get or create user
     user = get_or_create_user(telegram_id)
     
@@ -34,16 +45,16 @@ async def handle_new_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
         user_id=user["id"],
         content=content,
         telegram_message_id=message_id,
-        category="someday"
+        category=category
     )
     
     # Get updated counts
     counts = get_task_counts(user["id"])
     
     # Send confirmation
-    task_text = "task" if counts["someday"] == 1 else "tasks"
+    task_text = "task" if counts[category] == 1 else "tasks"
     await update.message.reply_text(
-        f"✓ Added to someday ({counts['someday']} {task_text})"
+        f"✓ Added to {category} ({counts[category]} {task_text})"
     )
 
 
@@ -60,6 +71,16 @@ async def handle_edited_message(update: Update, context: ContextTypes.DEFAULT_TY
     if not new_content:
         return
     
+    # Check for special tags to determine category
+    # Special tags can be !now or !soon at the start or end of the message
+    category = "someday"
+    if new_content.lower().startswith("!now") or new_content.lower().endswith("!now"):
+        category = "now"
+        new_content = new_content.replace("!now", "").strip()
+    elif new_content.lower().startswith("!soon") or new_content.lower().endswith("!soon"):
+        category = "soon"
+        new_content = new_content.replace("!soon", "").strip()
+
     # Get user
     user = get_or_create_user(telegram_id)
     
@@ -70,11 +91,22 @@ async def handle_edited_message(update: Update, context: ContextTypes.DEFAULT_TY
         # Task exists and is active - update it
         update_task_content(task["id"], new_content)
         
-        # Reply to the original edited message
-        await update.edited_message.reply_text(
-            "✓ Task updated",
-            reply_to_message_id=message_id
-        )
+        # Determine if task needs to be moved to a different category
+        if task["category"] != category:
+            # Move task to appropriate category if needed
+            update_task_category(task["id"], category)
+
+            await update.edited_message.reply_text(
+                f"✓ Task updated and moved to {category}",
+                reply_to_message_id=message_id
+            )
+        
+        else:
+            # Reply to the original edited message
+            await update.edited_message.reply_text(
+                "✓ Task updated",
+                reply_to_message_id=message_id
+            )
     else:
         # Task not found - notify user
         await update.edited_message.reply_text(

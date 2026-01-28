@@ -17,6 +17,10 @@ from bot.utils.keyboards import get_main_keyboard, get_task_keyboard, get_settin
 from config.settings import settings
 
 
+# Track currently displayed tasks per user for shuffle diversity
+_user_current_display = {}
+
+
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle all inline button callbacks."""
     query = update.callback_query
@@ -86,10 +90,33 @@ async def show_category_view(query, user: dict, category: str, shuffle: bool = F
     
     # Apply shuffle for NOW tasks
     if category == "now":
-        display_tasks = get_shuffled_tasks(tasks, now_limit or settings.DEFAULT_NOW_LIMIT)
+        # Get current display tracking for this user
+        current_display = _user_current_display.get(user["id"], [])
+        
+        if shuffle:
+            # Use enhanced shuffle with current display exclusion
+            display_tasks = get_shuffled_tasks(
+                tasks, 
+                now_limit or settings.DEFAULT_NOW_LIMIT, 
+                currently_displayed=current_display
+            )
+        else:
+            # For initial view, use basic shuffle or take first tasks
+            if len(tasks) > now_limit:
+                display_tasks = get_shuffled_tasks(
+                    tasks, 
+                    now_limit or settings.DEFAULT_NOW_LIMIT, 
+                    currently_displayed=[]
+                )
+            else:
+                display_tasks = tasks[:now_limit or settings.DEFAULT_NOW_LIMIT]
+        
         # Update shown stats for displayed tasks
         for task in display_tasks:
             update_task_shown(task["id"])
+        
+        # Store current display for next shuffle
+        _user_current_display[user["id"]] = [t["id"] for t in display_tasks]
         limit = now_limit
     else:
         display_tasks = tasks[:10]

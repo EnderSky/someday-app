@@ -24,7 +24,7 @@ THEME_NAMES = {
 CATEGORY_EMOJI = {"now": "🔥", "soon": "⏳", "someday": "📦"}
 
 # Category symbols (for monospace theme)
-CATEGORY_SYMBOL = {"now": "[!]", "soon": "[~]", "someday": "[.]"}
+CATEGORY_SYMBOL = {"now": "[!]", "soon": "[~]", "someday": "[_]"}
 
 # =============================================================================
 # COMMON TEXT STRINGS
@@ -476,7 +476,7 @@ def _format_task_list_monospace(tasks: list, category: str, counts: dict, limit:
             max_len = MONO_BOX_WIDTH - 8
             if len(content) > max_len:
                 content = content[:max_len - 2] + ".."
-            lines.append(_mono_line(f"  [{i}]  {content}"))
+            lines.append(_mono_line(f"  [{i}] {content}"))
         
         remaining = total - len(display_tasks)
         if remaining > 0:

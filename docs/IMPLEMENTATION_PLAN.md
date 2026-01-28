@@ -110,8 +110,9 @@ CREATE TABLE users (
 -- Row Level Security (kept enabled for future web app)
 -- Bot uses service_role key which bypasses RLS
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can access own record" ON users
-  FOR ALL USING (id = auth.uid());
+CREATE POLICY "Users can access own record" ON public.users 
+  FOR ALL TO authenticated USING ((SELECT auth.uid()) = id) 
+  WITH CHECK ((SELECT auth.uid()) = id);
 ```
 
 ### Tasks Table
@@ -140,8 +141,9 @@ CREATE INDEX idx_tasks_message_id ON tasks(user_id, telegram_message_id)
 -- Row Level Security (kept enabled for future web app)
 -- Bot uses service_role key which bypasses RLS
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can only access their own tasks" ON tasks
-  FOR ALL USING (user_id = auth.uid());
+CREATE POLICY "Users can access own tasks" ON public.tasks 
+  FOR ALL TO authenticated USING ((SELECT auth.uid()) = user_id) 
+  WITH CHECK ((SELECT auth.uid()) = user_id);
 ```
 
 ---

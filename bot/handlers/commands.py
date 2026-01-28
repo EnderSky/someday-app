@@ -9,6 +9,10 @@ from bot.utils.keyboards import get_main_keyboard, get_task_list_keyboard
 from config.settings import settings
 
 
+# Import current display tracking from callbacks
+from bot.handlers.callbacks import _user_current_display
+
+
 WELCOME_MESSAGE = """🎯 Someday
 
 Your ADHD-friendly task manager.
@@ -17,6 +21,7 @@ How it works:
 • Just send me any message to add a task
 • Edit messages to update tasks
 • Tasks go to Someday by default
+• Add !now or !soon tags to send tasks there directly
 • Move important tasks to Soon or Now
 • I show only a few NOW tasks to keep you focused
 
@@ -63,14 +68,25 @@ async def now_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     now_tasks = get_tasks_by_category(user["id"], "now")
     counts = get_task_counts(user["id"])
     
-    # Apply smart shuffle
-    shuffled_tasks = get_shuffled_tasks(now_tasks, now_limit or settings.DEFAULT_NOW_LIMIT)
+    # Apply enhanced shuffle with current display tracking
+    current_display = _user_current_display.get(user["id"], [])
+    if len(now_tasks) > now_limit:
+        shuffled_tasks = get_shuffled_tasks(
+            now_tasks, 
+            now_limit or settings.DEFAULT_NOW_LIMIT, 
+            currently_displayed=current_display
+        )
+    else:
+        shuffled_tasks = now_tasks[:now_limit or settings.DEFAULT_NOW_LIMIT]
+    
+    # Store current display for tracking
+    _user_current_display[user["id"]] = [t["id"] for t in shuffled_tasks]
     
     # Format message with theme
     message, parse_mode = format_task_list(shuffled_tasks, "now", counts, limit=now_limit, theme=theme)
     
     # Get keyboard with counts
-    keyboard = get_task_list_keyboard(shuffled_tasks, "now", counts=counts)
+    keyboard = get_task_list_keyboard(shuffled_tasks, "now", counts=counts, limit=now_limit)
     
     # Send new message and store its ID
     sent_message = await update.message.reply_text(message, reply_markup=keyboard, parse_mode=parse_mode)
