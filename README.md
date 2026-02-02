@@ -17,7 +17,12 @@ Someday App is a minimalist task management bot designed to reduce overwhelm and
 - Smart shuffle algorithm to rotate through NOW tasks
 - Prevents overload by limiting visible tasks
 - Always shows total backlog count (nothing forgotten)
-- User-configurable settings
+- Pagination for Soon, Someday, and Completed lists (10 items per page)
+- View completed tasks with optional quick-access button
+- User-configurable settings:
+  - NOW display limit (1-5 tasks)
+  - Visual theme (Classic, Minimal, Monospace)
+  - Show/hide Completed button
 
 ## Tech Stack
 
@@ -67,9 +72,20 @@ Just send any message to add a task - no command needed!
 
 Send any message to the bot and it becomes a task in your Someday list.
 
+Use tags to send tasks directly to a category:
+- `Buy milk !now` → adds to NOW
+- `Call dentist !soon` → adds to SOON
+
 ### Editing Tasks
 
 Edit your original message within 48 hours to update the task content.
+
+### Navigation
+
+- Tap numbered buttons to view task details
+- Use navigation buttons to switch between NOW, Soon, and Someday
+- Pagination buttons (← Prev / Next →) appear when lists exceed 10 items
+- Access Settings to customize your experience
 
 ## Documentation
 
