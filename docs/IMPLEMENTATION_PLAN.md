@@ -89,12 +89,12 @@ A minimalist, brain-dump style to-do list designed for ADHD users, delivered via
 
 ```
 ┌─────────────────┐     ┌──────────────────────┐     ┌─────────────────┐
-│  Telegram API   │────▶│  Oracle Cloud      │────▶│   Supabase      │
-│  (webhooks)     │     │  (Always Free)     │     │  (PostgreSQL)   │
+│  Telegram API   │────▶│  Oracle Cloud        │───▶│   Supabase      │
+│  (webhooks)     │     │  (Always Free)       │     │  (PostgreSQL)   │
 └─────────────────┘     └──────────────────────┘     └────────┬────────┘
-                                                          │
-                         ┌─────────────────┐              │
-                         │   Vercel        │◀─────────────┘
+                                                              │
+                         ┌─────────────────┐                  │
+                         │   Vercel        │◀────────────────┘
                          │  (Web App)      │   (future)
                          └─────────────────┘
 
@@ -167,33 +167,32 @@ CREATE INDEX idx_tasks_message_id ON tasks(user_id, telegram_message_id)
 someday-app/
 ├── bot/
 │   ├── __init__.py
-│   ├── main.py                 # Entry point, webhook setup
+│   ├── main.py                    # Entry point, webhook/polling modes
+│   ├── webhook_server.py           # FastAPI webhook server (production)
 │   ├── handlers/
 │   │   ├── __init__.py
-│   │   ├── commands.py         # /start, /now (/help redirects to /start)
-│   │   ├── callbacks.py        # Inline button handlers
-│   │   └── messages.py         # Free-form message + edited_message handling
+│   │   ├── commands.py            # /start, /now commands
+│   │   ├── callbacks.py           # Inline button handlers
+│   │   └── messages.py            # Free-form message + edited_message handling
 │   ├── services/
 │   │   ├── __init__.py
-│   │   ├── task_service.py     # CRUD operations, category management
-│   │   ├── user_service.py     # User settings management
-│   │   ├── shuffle_service.py  # Smart shuffle logic
-│   │   └── ai_service.py       # Stub for future Groq integration
+│   │   ├── task_service.py        # CRUD operations, category management
+│   │   ├── user_service.py        # User settings management
+│   │   └── shuffle_service.py     # Smart shuffle logic
 │   ├── db/
 │   │   ├── __init__.py
-│   │   └── supabase_client.py  # Supabase connection + queries
+│   │   └── supabase_client.py   # Supabase connection + queries
 │   └── utils/
 │       ├── __init__.py
-│       ├── keyboards.py        # Inline keyboard builders
-│       └── formatters.py       # Message formatting helpers
+│       ├── keyboards.py            # Inline keyboard builders
+│       └── formatters.py           # Message formatting helpers
 ├── config/
-│   └── settings.py             # Environment variables, constants
-├── tests/
-│   └── ...
-├── requirements.txt
-├── Dockerfile
-├── fly.toml
-└── .env.example
+│   └── settings.py                 # Environment variables, webhook validation
+├── docs/
+│   └── IMPLEMENTATION_PLAN.md   # Implementation guide
+├── requirements.txt               # Python dependencies (FastAPI ready)
+├── Dockerfile                    # Container configuration
+└── .env.example                  # Environment variable template
 ```
 
 ---
@@ -208,19 +207,18 @@ someday-app/
 - **No Platform Lock-in**: Standard Docker/Linux environment
 
 #### Oracle Cloud Deployment Steps
-```bash
-# 1. Sign up at [cloud.oracle.com](https://cloud.oracle.com) (credit card required for verification)
-# 2. Create Always Free resources:
-#    - Ampere A1 compute instance (4 cores, 24GB RAM)
-#    - 200GB block storage
-#    - Load balancer with public IP
-# 3. Deploy with Docker:
-#    docker build -t someday-app .
-#    docker run -d -p 8080:8080 someday-app
-# 4. Configure firewall rules for port 8080
-# 5. Set webhook URL in BotFather to Oracle Cloud endpoint
-# 6. Deploy with health checks and auto-restart policies
-```
+1. Sign up at [cloud.oracle.com](https://cloud.oracle.com) (credit card required for verification)
+2. Create Always Free resources:
+   - Ampere A1 compute instance (4 cores, 24GB RAM)
+   - 200GB block storage
+   - Load balancer with public IP
+3. Deploy with Docker:
+   `docker build -t someday-app .`
+   `docker run -d -p 8080:8080 someday-app`
+4. Configure firewall rules for port 8080
+5. Set webhook URL in BotFather to Oracle Cloud endpoint
+6. Deploy with health checks and auto-restart policies
+
 
 **Dockerfile:**
 ```dockerfile
@@ -252,6 +250,8 @@ ENV=production
 GROQ_API_KEY=your_groq_key
 ```
 
+---
+
 ## Future Improvements
 
 Future improvements to be implemented:
@@ -280,9 +280,9 @@ Future improvements to be implemented:
 #### Planned Features
 
 1. **Suggest Button**
-   - Analyzes SOON + SOMEDAY tasks
-   - Picks 1-3 that seem important
-   - Based on: urgency keywords, age, life-critical topics
+- Analyzes SOON + SOMEDAY tasks
+- Picks 1-3 that seem important
+- Based on: urgency keywords, age, life-critical topics
 
 #### Prompt Template
 
@@ -304,7 +304,6 @@ Respond with JSON only: {"task_ids": ["id1", "id2"]}
 ```
 
 2. **AI Auto-Categorization**
-
 - On task creation, AI suggests Now/Soon/Someday
 - User confirms or changes category
 - Toggleable in settings (`ai_categorize_enabled`)
