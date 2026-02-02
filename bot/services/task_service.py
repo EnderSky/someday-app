@@ -15,18 +15,25 @@ def create_task(user_id: str, content: str, telegram_message_id: int, category: 
     return response.data[0]
 
 
-def get_tasks_by_category(user_id: str, category: str) -> list:
-    """Get all active tasks for a user in a specific category."""
+def get_tasks_by_category(user_id: str, category: str, limit: Optional[int] = None, offset: int = 0) -> list:
+    """Get active tasks for a user in a specific category with optional pagination."""
     client = get_client()
-    response = (
+    query = (
         client.table("tasks")
         .select("*")
         .eq("user_id", user_id)
         .eq("category", category)
         .is_("completed_at", "null")
         .order("created_at", desc=False)
-        .execute()
     )
+    
+    if offset > 0:
+        query = query.offset(offset)
+    
+    if limit is not None:
+        query = query.limit(limit)
+    
+    response = query.execute()
     return response.data
 
 
@@ -125,3 +132,34 @@ def update_task_shown(task_id: str) -> dict:
         .execute()
     )
     return response.data[0]
+
+
+def get_completed_tasks(user_id: str, limit: int = 10, offset: int = 0) -> list:
+    """Get completed tasks for a user, sorted by most recently completed."""
+    client = get_client()
+    query = (
+        client.table("tasks")
+        .select("*")
+        .eq("user_id", user_id)
+        .not_.is_("completed_at", "null")
+        .order("completed_at", desc=True)
+    )
+    
+    if offset > 0:
+        query = query.offset(offset)
+    
+    response = query.limit(limit).execute()
+    return response.data
+
+
+def get_completed_task_count(user_id: str) -> int:
+    """Get count of completed tasks for a user."""
+    client = get_client()
+    response = (
+        client.table("tasks")
+        .select("id", count="exact")
+        .eq("user_id", user_id)
+        .not_.is_("completed_at", "null")
+        .execute()
+    )
+    return response.count or 0

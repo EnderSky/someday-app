@@ -63,6 +63,7 @@ async def now_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # Get user's NOW limit setting and theme
     now_limit = get_user_setting(user, "now_display_limit", settings.DEFAULT_NOW_LIMIT)
     theme = get_user_theme(user)
+    show_completed = bool(get_user_setting(user, "show_completed_button", False))
     
     # Get tasks and counts
     now_tasks = get_tasks_by_category(user["id"], "now")
@@ -86,7 +87,7 @@ async def now_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     message, parse_mode = format_task_list(shuffled_tasks, "now", counts, limit=now_limit, theme=theme)
     
     # Get keyboard with counts
-    keyboard = get_task_list_keyboard(shuffled_tasks, "now", counts=counts, limit=now_limit)
+    keyboard = get_task_list_keyboard(shuffled_tasks, "now", counts=counts, limit=now_limit, show_completed=show_completed)
     
     # Send new message and store its ID
     sent_message = await update.message.reply_text(message, reply_markup=keyboard, parse_mode=parse_mode)

@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional
+from config.settings import settings
 
 # =============================================================================
 # THEME CONSTANTS
@@ -35,14 +36,17 @@ TEXT_TASK = "TASK"
 TEXT_SETTINGS = "SETTINGS"
 TEXT_DISPLAY_LIMIT = "Display Limit"
 TEXT_THEME = "THEME"
+TEXT_COMPLETED = "COMPLETED"
 
 # Icons/symbols for views
 ICON_TASK = "📌"
 ICON_SETTINGS = "⚙️"
 ICON_THEME = "🎨"
+ICON_COMPLETED = "✅"
 SYMBOL_TASK = "[*]"
 SYMBOL_SETTINGS = "[=]"
 SYMBOL_THEME = "[#]"
+SYMBOL_COMPLETED = "[v]"
 
 # Labels
 TEXT_SHOWN = "Shown"
@@ -59,6 +63,12 @@ TEXT_LIMIT_DESC_FULL = "How many tasks to show at once in NOW view."
 TEXT_THEME_DESC_LINE1 = "Choose your visual"
 TEXT_THEME_DESC_LINE2 = "style."
 TEXT_THEME_DESC_FULL = "Choose your preferred visual style."
+
+# Show completed button description
+TEXT_SHOW_COMPLETED = "Show Completed"
+TEXT_SHOW_COMPLETED_DESC_LINE1 = "Show Completed button"
+TEXT_SHOW_COMPLETED_DESC_LINE2 = "in task views."
+TEXT_SHOW_COMPLETED_DESC_FULL = "Show the Completed button in task list views."
 
 # Empty state messages per category
 EMPTY_MESSAGES = {
@@ -111,16 +121,43 @@ def _get_task_age(created_at) -> str:
         return f"{delta.days}d ago"
 
 
+def _get_completed_time_ago(completed_at) -> str:
+    """Get human-readable time since task was completed."""
+    if not completed_at:
+        return ""
+    
+    if isinstance(completed_at, str):
+        completed_dt = datetime.fromisoformat(completed_at.replace("Z", "+00:00"))
+    else:
+        completed_dt = completed_at
+    
+    now = datetime.now(timezone.utc)
+    delta = now - completed_dt
+    
+    if delta.days == 0:
+        hours = delta.seconds // 3600
+        if hours == 0:
+            minutes = delta.seconds // 60
+            if minutes == 0:
+                return "just now"
+            return f"{minutes}m ago"
+        return f"{hours}h ago"
+    elif delta.days == 1:
+        return "yesterday"
+    else:
+        return f"{delta.days}d ago"
+
+
 def _get_display_counts(tasks: list, counts: dict, category: str, limit: Optional[int]) -> tuple[int, int]:
     """Get displayed and total task counts."""
     total = counts.get(category, len(tasks))
-    displayed = min(len(tasks), limit) if limit else min(len(tasks), 10)
+    displayed = min(len(tasks), limit) if limit else min(len(tasks), settings.DEFAULT_PAGE_SIZE)
     return displayed, total
 
 
 def _get_display_tasks(tasks: list, limit: Optional[int]) -> list:
     """Get list of tasks to display."""
-    return tasks[:limit] if limit else tasks[:10]
+    return tasks[:limit] if limit else tasks[:settings.DEFAULT_PAGE_SIZE]
 
 
 def _build_task_meta(category: str, created_at, use_emoji: bool = True, separator: str = " · ") -> str:
@@ -141,19 +178,27 @@ def _build_task_meta(category: str, created_at, use_emoji: bool = True, separato
 # PUBLIC API
 # =============================================================================
 
-def format_task_list(tasks: list, category: str, counts: dict, limit: Optional[int] = None, theme: str = THEME_CLASSIC) -> tuple[str, Optional[str]]:
+def format_task_list(tasks: list, category: str, counts: dict, limit: Optional[int] = None, theme: str = THEME_CLASSIC, page: int = 0) -> tuple[str, Optional[str]]:
     """
     Format a list of tasks for display.
+    
+    Args:
+        tasks: List of tasks to display (already paginated)
+        category: Task category (now, soon, someday)
+        counts: Dict with total counts per category
+        limit: Display limit (for NOW category)
+        theme: Visual theme
+        page: Current page number (0-indexed, for soon/someday)
     
     Returns:
         tuple: (message_text, parse_mode) - parse_mode is "Markdown" for monospace, None otherwise
     """
     if theme == THEME_MINIMAL:
-        return _format_task_list_minimal(tasks, category, counts, limit), None
+        return _format_task_list_minimal(tasks, category, counts, limit, page), None
     elif theme == THEME_MONOSPACE:
-        return _format_task_list_monospace(tasks, category, counts, limit), "Markdown"
+        return _format_task_list_monospace(tasks, category, counts, limit, page), "Markdown"
     else:  # classic
-        return _format_task_list_classic(tasks, category, counts, limit), None
+        return _format_task_list_classic(tasks, category, counts, limit, page), None
 
 
 def format_task_detail(task: dict, theme: str = THEME_CLASSIC) -> tuple[str, Optional[str]]:
@@ -209,6 +254,42 @@ def format_settings_theme(current_theme: str, theme: str = THEME_CLASSIC) -> tup
         return _format_theme_classic(current_theme), None
 
 
+def format_completed_list(tasks: list, total_count: int, theme: str = THEME_CLASSIC, page: int = 0) -> tuple[str, Optional[str]]:
+    """
+    Format completed tasks list for display.
+    
+    Args:
+        tasks: List of completed tasks to display (already paginated)
+        total_count: Total number of completed tasks
+        theme: Visual theme
+        page: Current page number (0-indexed)
+    
+    Returns:
+        tuple: (message_text, parse_mode)
+    """
+    if theme == THEME_MINIMAL:
+        return _format_completed_list_minimal(tasks, total_count, page), None
+    elif theme == THEME_MONOSPACE:
+        return _format_completed_list_monospace(tasks, total_count, page), "Markdown"
+    else:  # classic
+        return _format_completed_list_classic(tasks, total_count, page), None
+
+
+def format_settings_show_completed(is_enabled: bool, theme: str = THEME_CLASSIC) -> tuple[str, Optional[str]]:
+    """
+    Format show completed button settings view.
+    
+    Returns:
+        tuple: (message_text, parse_mode)
+    """
+    if theme == THEME_MINIMAL:
+        return _format_show_completed_minimal(is_enabled), None
+    elif theme == THEME_MONOSPACE:
+        return _format_show_completed_monospace(is_enabled), "Markdown"
+    else:  # classic
+        return _format_show_completed_classic(is_enabled), None
+
+
 # =============================================================================
 # CLASSIC THEME
 # =============================================================================
@@ -231,22 +312,23 @@ CLASSIC_TOP = SQUARE_CLASSIC_TOP
 CLASSIC_MID = SQUARE_CLASSIC_MID
 CLASSIC_BOT = SQUARE_CLASSIC_BOT
 
-def _format_task_list_classic(tasks: list, category: str, counts: dict, limit: Optional[int] = None) -> str:
+def _format_task_list_classic(tasks: list, category: str, counts: dict, limit: Optional[int] = None, page: int = 0) -> str:
     emoji = CATEGORY_EMOJI.get(category, "📋")
-    displayed, total = _get_display_counts(tasks, counts, category, limit)
+    total = counts.get(category, len(tasks))
     
-    # title_dash_number = CLASSIC_BOX_WIDTH - len(f" {emoji} {category.upper()} ")
-    # title = f"┌{'─' * (title_dash_number // 2)} {emoji} {category.upper()} {'─' * (title_dash_number - title_dash_number // 2)}┐"
-    
-    # shown_dash_number = CLASSIC_BOX_WIDTH - len(f" {TEXT_SHOWN}: {displayed}/{total} ") + 3
-    # shown_line = f"├{'─' * (shown_dash_number // 2)} {TEXT_SHOWN}: {displayed}/{total} {'─' * (shown_dash_number - shown_dash_number // 2)}┤"
-    # lines = [title, 
-    #          shown_line]
+    # For paginated views (soon/someday), calculate what we're showing
+    if category in ("soon", "someday") and total > 0:
+        start = page * settings.DEFAULT_PAGE_SIZE + 1
+        end = min(start + len(tasks) - 1, total)
+        shown_text = f"{start}-{end}/{total}"
+    else:
+        displayed = len(tasks)
+        shown_text = f"{displayed}/{total}"
 
     lines = [
         CLASSIC_TOP,
         f"{CLASSIC_SIDE} {emoji} {category.upper()}",
-        f"{CLASSIC_SIDE} {TEXT_SHOWN}: {displayed}/{total}",
+        f"{CLASSIC_SIDE} {TEXT_SHOWN}: {shown_text}",
         CLASSIC_MID,
     ]
     
@@ -259,14 +341,16 @@ def _format_task_list_classic(tasks: list, category: str, counts: dict, limit: O
             CLASSIC_SIDE,
         ])
     else:
-        display_tasks = _get_display_tasks(tasks, limit)
+        display_tasks = _get_display_tasks(tasks, limit) if limit else tasks
         lines.append(CLASSIC_SIDE)
         for i, task in enumerate(display_tasks, 1):
             lines.append(f"{CLASSIC_SIDE} [{i}]  {task['content']}")
         
-        remaining = total - len(display_tasks)
-        if remaining > 0:
-            lines.extend([CLASSIC_SIDE, f"{CLASSIC_SIDE} +{remaining} more"])
+        # For NOW view, show remaining count
+        if category == "now" and limit:
+            remaining = total - len(display_tasks)
+            if remaining > 0:
+                lines.extend([CLASSIC_SIDE, f"{CLASSIC_SIDE} +{remaining} more"])
         lines.append(CLASSIC_SIDE)
         
         if tasks:
@@ -338,6 +422,63 @@ def _format_theme_classic(current_theme: str) -> str:
     ])
 
 
+def _format_completed_list_classic(tasks: list, total_count: int, page: int = 0) -> str:
+    displayed = len(tasks)
+    
+    # Calculate what we're showing for pagination
+    if total_count > 0 and displayed > 0:
+        start = page * settings.DEFAULT_PAGE_SIZE + 1
+        end = min(start + displayed - 1, total_count)
+        shown_text = f"{start}-{end}/{total_count}"
+    else:
+        shown_text = f"{displayed}/{total_count}"
+    
+    lines = [
+        CLASSIC_TOP,
+        f"{CLASSIC_SIDE} {ICON_COMPLETED} {TEXT_COMPLETED}",
+        f"{CLASSIC_SIDE} {TEXT_SHOWN}: {shown_text}",
+        CLASSIC_MID,
+    ]
+    
+    if not tasks:
+        lines.extend([
+            CLASSIC_SIDE,
+            f"{CLASSIC_SIDE} No completed tasks yet.",
+            f"{CLASSIC_SIDE} Get to work!",
+            CLASSIC_SIDE,
+        ])
+    else:
+        lines.append(CLASSIC_SIDE)
+        for task in tasks:
+            time_ago = _get_completed_time_ago(task.get("completed_at"))
+            content = task["content"]
+            # Truncate long content
+            if len(content) > 25:
+                content = content[:22] + "..."
+            lines.append(f"{CLASSIC_SIDE} [{time_ago}]  {content}")
+        lines.append(CLASSIC_SIDE)
+    
+    lines.append(CLASSIC_BOT)
+    
+    return "\n".join(lines)
+
+
+def _format_show_completed_classic(is_enabled: bool) -> str:
+    status = "On" if is_enabled else "Off"
+    return "\n".join([
+        CLASSIC_TOP,
+        f"{CLASSIC_SIDE} {ICON_COMPLETED} {TEXT_SHOW_COMPLETED}",
+        CLASSIC_MID,
+        CLASSIC_SIDE,
+        f"{CLASSIC_SIDE} {TEXT_CURRENT}: {status}",
+        CLASSIC_SIDE,
+        f"{CLASSIC_SIDE} {TEXT_SHOW_COMPLETED_DESC_LINE1}",
+        f"{CLASSIC_SIDE} {TEXT_SHOW_COMPLETED_DESC_LINE2}",
+        CLASSIC_SIDE,
+        CLASSIC_BOT,
+    ])
+
+
 # =============================================================================
 # MINIMAL THEME
 # =============================================================================
@@ -345,13 +486,22 @@ def _format_theme_classic(current_theme: str) -> str:
 MINIMAL_DIVIDER = "───────────────"
 
 
-def _format_task_list_minimal(tasks: list, category: str, counts: dict, limit: Optional[int] = None) -> str:
+def _format_task_list_minimal(tasks: list, category: str, counts: dict, limit: Optional[int] = None, page: int = 0) -> str:
     emoji = CATEGORY_EMOJI.get(category, "📋")
-    displayed, total = _get_display_counts(tasks, counts, category, limit)
+    total = counts.get(category, len(tasks))
+    
+    # For paginated views (soon/someday), calculate what we're showing
+    if category in ("soon", "someday") and total > 0:
+        start = page * settings.DEFAULT_PAGE_SIZE + 1
+        end = min(start + len(tasks) - 1, total)
+        shown_text = f"{start}-{end}/{total}"
+    else:
+        displayed = len(tasks)
+        shown_text = f"{displayed}/{total}"
     
     lines = [
         f"{emoji} {category.upper()}",
-        f"{TEXT_SHOWN}: {displayed}/{total}",
+        f"{TEXT_SHOWN}: {shown_text}",
         MINIMAL_DIVIDER,
         "",
     ]
@@ -359,13 +509,15 @@ def _format_task_list_minimal(tasks: list, category: str, counts: dict, limit: O
     if not tasks:
         lines.append(EMPTY_MESSAGES.get(category, DEFAULT_EMPTY)["full"])
     else:
-        display_tasks = _get_display_tasks(tasks, limit)
+        display_tasks = _get_display_tasks(tasks, limit) if limit else tasks
         for i, task in enumerate(display_tasks, 1):
             lines.append(f"[{i}]  {task['content']}")
         
-        remaining = total - len(display_tasks)
-        if remaining > 0:
-            lines.extend(["", f"+{remaining} more"])
+        # For NOW view, show remaining count
+        if category == "now" and limit:
+            remaining = total - len(display_tasks)
+            if remaining > 0:
+                lines.extend(["", f"+{remaining} more"])
         
         lines.extend(["", TEXT_SELECT_TASKS])
     
@@ -420,6 +572,49 @@ def _format_theme_minimal(current_theme: str) -> str:
     ])
 
 
+def _format_completed_list_minimal(tasks: list, total_count: int, page: int = 0) -> str:
+    displayed = len(tasks)
+    
+    # Calculate what we're showing for pagination
+    if total_count > 0 and displayed > 0:
+        start = page * settings.DEFAULT_PAGE_SIZE + 1
+        end = min(start + displayed - 1, total_count)
+        shown_text = f"{start}-{end}/{total_count}"
+    else:
+        shown_text = f"{displayed}/{total_count}"
+    
+    lines = [
+        f"{ICON_COMPLETED} {TEXT_COMPLETED}",
+        f"{TEXT_SHOWN}: {shown_text}",
+        MINIMAL_DIVIDER,
+        "",
+    ]
+    
+    if not tasks:
+        lines.append("No completed tasks yet. Get to work!")
+    else:
+        for task in tasks:
+            time_ago = _get_completed_time_ago(task.get("completed_at"))
+            content = task["content"]
+            if len(content) > 30:
+                content = content[:27] + "..."
+            lines.append(f"[{time_ago}]  {content}")
+    
+    return "\n".join(lines)
+
+
+def _format_show_completed_minimal(is_enabled: bool) -> str:
+    status = "On" if is_enabled else "Off"
+    return "\n".join([
+        f"{ICON_COMPLETED} {TEXT_SHOW_COMPLETED}",
+        MINIMAL_DIVIDER,
+        "",
+        f"{TEXT_CURRENT}: {status}",
+        "",
+        TEXT_SHOW_COMPLETED_DESC_FULL,
+    ])
+
+
 # =============================================================================
 # MONOSPACE THEME
 # =============================================================================
@@ -448,15 +643,24 @@ def _mono_line(text: str = "") -> str:
     return f"│{_pad(text)}│"
 
 
-def _format_task_list_monospace(tasks: list, category: str, counts: dict, limit: Optional[int] = None) -> str:
+def _format_task_list_monospace(tasks: list, category: str, counts: dict, limit: Optional[int] = None, page: int = 0) -> str:
     symbol = CATEGORY_SYMBOL.get(category, "[?]")
-    displayed, total = _get_display_counts(tasks, counts, category, limit)
+    total = counts.get(category, len(tasks))
+    
+    # For paginated views (soon/someday), calculate what we're showing
+    if category in ("soon", "someday") and total > 0:
+        start = page * settings.DEFAULT_PAGE_SIZE + 1
+        end = min(start + len(tasks) - 1, total)
+        shown_text = f"{start}-{end}/{total}"
+    else:
+        displayed = len(tasks)
+        shown_text = f"{displayed}/{total}"
     
     lines = [
         "```",
         _mono_box_top(),
         _mono_line(f"  {symbol} {category.upper()}"),
-        _mono_line(f"  {TEXT_SHOWN}: {displayed}/{total}"),
+        _mono_line(f"  {TEXT_SHOWN}: {shown_text}"),
         _mono_box_mid(),
     ]
     
@@ -469,7 +673,7 @@ def _format_task_list_monospace(tasks: list, category: str, counts: dict, limit:
             _mono_line(),
         ])
     else:
-        display_tasks = _get_display_tasks(tasks, limit)
+        display_tasks = _get_display_tasks(tasks, limit) if limit else tasks
         lines.append(_mono_line())
         for i, task in enumerate(display_tasks, 1):
             content = task["content"]
@@ -478,9 +682,11 @@ def _format_task_list_monospace(tasks: list, category: str, counts: dict, limit:
                 content = content[:max_len - 2] + ".."
             lines.append(_mono_line(f"  [{i}] {content}"))
         
-        remaining = total - len(display_tasks)
-        if remaining > 0:
-            lines.extend([_mono_line(), _mono_line(f"  +{remaining} more")])
+        # For NOW view, show remaining count
+        if category == "now" and limit:
+            remaining = total - len(display_tasks)
+            if remaining > 0:
+                lines.extend([_mono_line(), _mono_line(f"  +{remaining} more")])
         lines.append(_mono_line())
     
     lines.extend([_mono_box_bot(), "```"])
@@ -575,6 +781,66 @@ def _format_theme_monospace(current_theme: str) -> str:
         _mono_line(),
         _mono_line(f"  {TEXT_THEME_DESC_LINE1}"),
         _mono_line(f"  {TEXT_THEME_DESC_LINE2}"),
+        _mono_line(),
+        _mono_box_bot(),
+        "```",
+    ])
+
+
+def _format_completed_list_monospace(tasks: list, total_count: int, page: int = 0) -> str:
+    displayed = len(tasks)
+    
+    # Calculate what we're showing for pagination
+    if total_count > 0 and displayed > 0:
+        start = page * settings.DEFAULT_PAGE_SIZE + 1
+        end = min(start + displayed - 1, total_count)
+        shown_text = f"{start}-{end}/{total_count}"
+    else:
+        shown_text = f"{displayed}/{total_count}"
+    
+    lines = [
+        "```",
+        _mono_box_top(),
+        _mono_line(f"  {SYMBOL_COMPLETED} {TEXT_COMPLETED}"),
+        _mono_line(f"  {TEXT_SHOWN}: {shown_text}"),
+        _mono_box_mid(),
+    ]
+    
+    if not tasks:
+        lines.extend([
+            _mono_line(),
+            _mono_line("  No completed tasks yet."),
+            _mono_line("  Get to work!"),
+            _mono_line(),
+        ])
+    else:
+        lines.append(_mono_line())
+        for task in tasks:
+            time_ago = _get_completed_time_ago(task.get("completed_at"))
+            content = task["content"]
+            max_len = MONO_BOX_WIDTH - 4
+            if len(content) > max_len:
+                content = content[:max_len - 2] + ".."
+            lines.append(_mono_line(f"  [{time_ago}] {content}"))
+        lines.append(_mono_line())
+    
+    lines.extend([_mono_box_bot(), "```"])
+    
+    return "\n".join(lines)
+
+
+def _format_show_completed_monospace(is_enabled: bool) -> str:
+    status = "On" if is_enabled else "Off"
+    return "\n".join([
+        "```",
+        _mono_box_top(),
+        _mono_line(f"  {SYMBOL_COMPLETED} {TEXT_SHOW_COMPLETED}"),
+        _mono_box_mid(),
+        _mono_line(),
+        _mono_line(f"  {TEXT_CURRENT}: {status}"),
+        _mono_line(),
+        _mono_line(f"  {TEXT_SHOW_COMPLETED_DESC_LINE1}"),
+        _mono_line(f"  {TEXT_SHOW_COMPLETED_DESC_LINE2}"),
         _mono_line(),
         _mono_box_bot(),
         "```",

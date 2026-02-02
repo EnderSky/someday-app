@@ -10,10 +10,12 @@ from bot.services.task_service import (
     complete_task,
     delete_task,
     update_task_shown,
+    get_completed_tasks,
+    get_completed_task_count,
 )
 from bot.services.shuffle_service import get_shuffled_tasks
-from bot.utils.formatters import format_task_list, format_task_detail, format_settings, format_settings_now_limit, format_settings_theme
-from bot.utils.keyboards import get_main_keyboard, get_task_keyboard, get_settings_keyboard, get_task_list_keyboard, get_settings_now_limit_keyboard, get_settings_theme_keyboard
+from bot.utils.formatters import format_task_list, format_task_detail, format_settings, format_settings_now_limit, format_settings_theme, format_completed_list, format_settings_show_completed
+from bot.utils.keyboards import get_main_keyboard, get_task_keyboard, get_settings_keyboard, get_task_list_keyboard, get_settings_now_limit_keyboard, get_settings_theme_keyboard, get_completed_list_keyboard, get_settings_show_completed_keyboard
 from config.settings import settings
 
 
@@ -68,28 +70,56 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await show_settings_now_limit(query, user)
     elif data == "settings_theme":
         await show_settings_theme(query, user)
+    elif data == "settings_show_completed":
+        await show_settings_show_completed(query, user)
+    elif data == "view_completed":
+        await show_completed_list(query, user)
     elif data.startswith("set_limit_"):
         limit = int(data.replace("set_limit_", ""))
         await handle_set_limit(query, user, limit)
     elif data.startswith("set_theme_"):
         theme_id = data.replace("set_theme_", "")
         await handle_set_theme(query, user, theme_id)
+    elif data == "set_show_completed_on":
+        await handle_set_show_completed(query, user, True)
+    elif data == "set_show_completed_off":
+        await handle_set_show_completed(query, user, False)
+    
+    # Pagination
+    elif data.startswith("page_soon_"):
+        page = int(data.replace("page_soon_", ""))
+        await show_category_view(query, user, "soon", page=page)
+    elif data.startswith("page_someday_"):
+        page = int(data.replace("page_someday_", ""))
+        await show_category_view(query, user, "someday", page=page)
+    elif data.startswith("page_completed_"):
+        page = int(data.replace("page_completed_", ""))
+        await show_completed_list(query, user, page=page)
     
     # No-op (for labels)
     elif data == "noop":
         pass
 
 
-async def show_category_view(query, user: dict, category: str, shuffle: bool = False) -> None:
-    """Show tasks for a specific category."""
+async def show_category_view(query, user: dict, category: str, shuffle: bool = False, page: int = 0) -> None:
+    """Show tasks for a specific category.
+    
+    Args:
+        query: Telegram callback query
+        user: User dict
+        category: Task category (now, soon, someday)
+        shuffle: Whether to shuffle NOW tasks
+        page: Page number for pagination (0-indexed, for soon/someday)
+    """
     now_limit = get_user_setting(user, "now_display_limit", settings.DEFAULT_NOW_LIMIT)
     theme = get_user_theme(user)
+    show_completed = bool(get_user_setting(user, "show_completed_button", False))
     
-    tasks = get_tasks_by_category(user["id"], category)
     counts = get_task_counts(user["id"])
     
     # Apply shuffle for NOW tasks
     if category == "now":
+        tasks = get_tasks_by_category(user["id"], category)
         # Get current display tracking for this user
         current_display = _user_current_display.get(user["id"], [])
         
@@ -118,13 +148,30 @@ async def show_category_view(query, user: dict, category: str, shuffle: bool = F
         # Store current display for next shuffle
         _user_current_display[user["id"]] = [t["id"] for t in display_tasks]
         limit = now_limit
+        total_count = counts.get(category, 0)
     else:
-        display_tasks = tasks[:10]
+        # For soon/someday, use pagination
+        offset = page * settings.DEFAULT_PAGE_SIZE
+        display_tasks = get_tasks_by_category(
+            user["id"], 
+            category, 
+            limit=settings.DEFAULT_PAGE_SIZE, 
+            offset=offset
+        )
         limit = None
+        total_count = counts.get(category, 0)
     
-    message, parse_mode = format_task_list(display_tasks, category, counts, limit=limit, theme=theme)
-    # keyboard = get_main_keyboard(category)
-    keyboard = get_task_list_keyboard(display_tasks, category, counts=counts, limit=limit)
+    message, parse_mode = format_task_list(display_tasks, category, counts, limit=limit, theme=theme, page=page)
+    keyboard = get_task_list_keyboard(
+        display_tasks, 
+        category, 
+        counts=counts, 
+        limit=limit, 
+        show_completed=show_completed,
+        page=page,
+        total_count=total_count,
+        page_size=settings.DEFAULT_PAGE_SIZE
+    )
     
     await query.edit_message_text(message, reply_markup=keyboard, parse_mode=parse_mode)
 
@@ -235,6 +282,44 @@ async def show_settings_theme(query, user: dict) -> None:
     await query.edit_message_text(message, reply_markup=keyboard, parse_mode=parse_mode)
 
 
+async def show_settings_show_completed(query, user: dict) -> None:
+    """Show the show completed button settings view."""
+    theme = get_user_theme(user)
+    is_enabled = get_user_setting(user, "show_completed_button", False)
+    
+    message, parse_mode = format_settings_show_completed(bool(is_enabled), theme=theme)
+    keyboard = get_settings_show_completed_keyboard(bool(is_enabled))
+    
+    await query.edit_message_text(message, reply_markup=keyboard, parse_mode=parse_mode)
+
+
+async def show_completed_list(query, user: dict, page: int = 0) -> None:
+    """Show list of completed tasks, sorted by most recently completed.
+    
+    Args:
+        query: Telegram callback query
+        user: User dict
+        page: Page number for pagination (0-indexed)
+    """
+    theme = get_user_theme(user)
+    
+    # Get total count first
+    total_count = get_completed_task_count(user["id"])
+    
+    # Get completed tasks for this page (most recent first)
+    offset = page * settings.DEFAULT_PAGE_SIZE
+    tasks = get_completed_tasks(user["id"], limit=settings.DEFAULT_PAGE_SIZE, offset=offset)
+    
+    message, parse_mode = format_completed_list(tasks, total_count, theme=theme, page=page)
+    keyboard = get_completed_list_keyboard(
+        page=page,
+        total_count=total_count,
+        page_size=settings.DEFAULT_PAGE_SIZE
+    )
+    
+    await query.edit_message_text(message, reply_markup=keyboard, parse_mode=parse_mode)
+
+
 async def handle_set_limit(query, user: dict, limit: int) -> None:
     """Update NOW display limit setting."""
     current_settings = user.get("settings", {}) or {}
@@ -257,6 +342,18 @@ async def handle_set_theme(query, user: dict, theme_id: str) -> None:
     # Refresh user data and show updated theme settings
     user["settings"] = current_settings
     await show_settings_theme(query, user)
+
+
+async def handle_set_show_completed(query, user: dict, is_enabled: bool) -> None:
+    """Update show completed button setting."""
+    current_settings = user.get("settings", {}) or {}
+    current_settings["show_completed_button"] = is_enabled
+    
+    update_user_settings(user["id"], current_settings)
+    
+    # Refresh user data and show updated settings
+    user["settings"] = current_settings
+    await show_settings_show_completed(query, user)
 
 
 def register_callback_handlers(application) -> None:

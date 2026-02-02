@@ -22,6 +22,7 @@ class Settings:
     
     # App settings
     DEFAULT_NOW_LIMIT: int = 3
+    DEFAULT_PAGE_SIZE: int = 10
     
     @property
     def is_production(self) -> bool:
