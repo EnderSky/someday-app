@@ -411,7 +411,7 @@ fly auth login
 fly launch
 
 # Set secrets
-fly secrets set TELEGRAM_BOT_TOKEN=xxx SUPABASE_URL=xxx SUPABASE_KEY=xxx
+fly secrets import < .env
 
 # Deploy
 fly deploy
