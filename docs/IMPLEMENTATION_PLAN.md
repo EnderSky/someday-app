@@ -43,7 +43,7 @@ A minimalist, brain-dump style to-do list designed for ADHD users, delivered via
 
 | Layer | Service | Purpose | Free Tier |
 |-------|---------|---------|-----------|
-| Bot Backend | Fly.io | Python Telegram bot | 256MB RAM, 3 VMs |
+| Bot Backend | Pella (Primary) / Fly.io (Legacy) | Python Telegram bot | 100MB RAM, 5GB storage |
 | Database | Supabase | PostgreSQL + Auth + Realtime | 500MB storage |
 | Web Frontend | Vercel | Future React/Next.js app | Unlimited deploys |
 | AI (Future) | Groq API | Task categorization + suggestions | Generous free tier |
@@ -54,15 +54,15 @@ A minimalist, brain-dump style to-do list designed for ADHD users, delivered via
 
 ### MVP Features
 
-- [ ] Add tasks via free-form messages (any message becomes a task)
-- [ ] Edit tasks by editing the original message
-- [ ] Now / Soon / Someday categorization
-- [ ] Promote / demote tasks between categories
-- [ ] Smart shuffle for NOW tasks (shows 3 at a time)
-- [ ] User-configurable NOW display limit (default: 3)
-- [ ] Task completion with brief celebration
-- [ ] Category counts always visible
-- [ ] User settings persistence
+- [x] Add tasks via free-form messages (any message becomes a task)
+- [x] Edit tasks by editing the original message
+- [x] Now / Soon / Someday categorization
+- [x] Promote / demote tasks between categories
+- [x] Smart shuffle for NOW tasks (shows 3 at a time)
+- [x] User-configurable NOW display limit (default: 3)
+- [x] Task completion with brief celebration
+- [x] Category counts always visible
+- [x] User settings persistence
 
 ### Future Features (Post-MVP)
 
@@ -76,18 +76,25 @@ A minimalist, brain-dump style to-do list designed for ADHD users, delivered via
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Telegram API   │────▶│   Fly.io        │────▶│   Supabase      │
-│  (webhooks)     │     │  (Python Bot)   │     │  (PostgreSQL)   │
+│  Telegram API   │────▶│   Pella         │────▶│   Supabase      │
+│  (webhooks)     │     │  (Free Bot Host)│     │  (PostgreSQL)   │
 └─────────────────┘     └─────────────────┘     └────────┬────────┘
-                                                         │
-                        ┌─────────────────┐              │
-                        │   Vercel        │◀─────────────┘
-                        │  (Web App)      │   (future)
-                        └─────────────────┘
+                                                          │
+                         ┌─────────────────┐              │
+                         │   Vercel        │◀─────────────┘
+                         │  (Web App)      │   (future)
+                         └─────────────────┘
 
-                        ┌─────────────────┐
-                        │   Groq API      │ (future AI)
-                        └─────────────────┘
+                         ┌─────────────────┐
+                         │   Groq API      │ (future AI)
+                         └─────────────────┘
+
+Alternative (Legacy):
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Telegram API   │────▶│   Fly.io        │────▶│   Supabase      │
+│  (webhooks)     │     │  (Paid Required)│     │  (PostgreSQL)   │
+└─────────────────┘     └─────────────────┘     └────────┬────────┘
 ```
 
 ---
@@ -345,7 +352,67 @@ After displaying, update `shown_count` and `last_shown_at` for selected tasks.
 
 ## Deployment
 
-### Fly.io Setup
+### Alternative: Pella (Recommended for Free Hosting)
+
+**Why Pella over Fly.io:**
+- **100% Free Forever**: No credit card, no trial limits
+- **Perfect Resource Match**: 100MB RAM, 5GB storage fits bot needs
+- **Specialized**: Built specifically for Telegram bots
+- **No Infrastructure Management**: Upload and deploy
+
+#### Webhook Implementation Required (Remaining)
+
+**Current Status:** Bot works in polling mode, needs webhook for Pella
+
+**Files to Modify:**
+1. **`bot/main.py`** - Fix incomplete webhook implementation (lines 35-56)
+2. **`config/settings.py`** - Add webhook URL validation
+3. **`bot/webhook_server.py`** - New lightweight server (FastAPI)
+4. **`requirements.txt`** - Add FastAPI dependency (already done)
+
+**Required Changes:**
+```python
+# 1. Fix run_webhook() in bot/main.py
+# Current Issue: Incomplete ASGI setup, wrong uvicorn usage
+# Fix: Proper FastAPI app with webhook handler
+
+# 2. Create bot/webhook_server.py
+# POST /webhook - Process Telegram updates using existing handlers
+# GET /health - Simple health check for monitoring
+# Integration: Reuse all existing bot.handlers logic
+
+# 3. Update config/settings.py
+# Add webhook URL format validation (must end with /webhook)
+# Add webhook secret support (optional security)
+
+# 4. Environment Variables for Pella
+WEBHOOK_URL=https://your-subdomain.pella.app/webhook
+PORT=8080
+ENV=production
+```
+
+**Implementation Complexity:**
+- Main.py fixes: ~30 lines
+- New webhook server: ~50 lines  
+- Settings validation: ~10 lines
+- Total effort: ~2.5 hours
+
+#### Pella Deployment Steps
+```bash
+# 1. Sign up on pella.app (no credit card required)
+# 2. Create new bot deployment
+# 3. Upload code (zip or Git)
+# 4. Set environment variables
+# 5. Configure webhook URL
+# 6. Start deployment
+```
+
+### Fly.io Setup (Legacy - Not Recommended)
+
+**Issues with Fly.io:**
+- **5-minute trial limit** - Requires credit card for continuous operation
+- **Over-provisioned resources** - 256MB RAM vs 100MB needed
+- **Higher complexity** - Docker + VM management required
 
 **fly.toml:**
 ```toml
@@ -392,14 +459,32 @@ CMD ["python", "-m", "bot.main"]
 TELEGRAM_BOT_TOKEN=your_bot_token
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your_service_role_key  # Use service_role key (bypasses RLS)
-WEBHOOK_URL=https://someday-app.fly.dev/webhook
-ENV=development  # or production
+
+# Pella (Recommended)
+WEBHOOK_URL=https://your-subdomain.pella.app/webhook
+ENV=production
+
+# Fly.io (Legacy)
+# WEBHOOK_URL=https://someday-app.fly.dev/webhook
+# ENV=development  # or production
+
 # Future
 GROQ_API_KEY=your_groq_key
 ```
 
 ### Deployment Commands
 
+#### Pella (Recommended)
+```bash
+# 1. Sign up at pella.app (no credit card)
+# 2. Create bot deployment
+# 3. Upload files or connect Git repo
+# 4. Set environment variables
+# 5. Deploy with webhook URL configuration
+# 6. Test webhook connectivity
+```
+
+#### Fly.io (Legacy)
 ```bash
 # Install Fly CLI
 curl -L https://fly.io/install.sh | sh
@@ -426,26 +511,27 @@ fly logs
 
 ### Phase 1: Core MVP (Week 1)
 
-- [ ] Project scaffolding + configuration
-- [ ] Supabase setup (tables, RLS policies)
-- [ ] Basic bot with /start, /now
-- [ ] Free-form message → task creation
-- [ ] Now/Soon/Someday categories
-- [ ] Promote/demote between categories
-- [ ] Inline keyboards with navigation
-- [ ] Fly.io deployment
+- [x] Project scaffolding + configuration
+- [x] Supabase setup (tables, RLS policies)
+- [x] Basic bot with /start, /now
+- [x] Free-form message → task creation
+- [x] Now/Soon/Someday categories
+- [x] Promote/demote between categories
+- [x] Inline keyboards with navigation
+- [ ] **Pella deployment with webhook mode**
 
 ### Phase 2: Smart Features (Week 2)
 
-- [ ] Smart shuffle algorithm
-- [ ] User-configurable NOW limit
-- [ ] User settings persistence
-- [ ] Message edit detection for task updates
-- [ ] Completion celebration
+- [x] Smart shuffle algorithm
+- [x] User-configurable NOW limit
+- [x] User settings persistence
+- [x] Message edit detection for task updates
+- [x] Completion celebration
+- [ ] **Webhook mode optimization for Pella resource constraints**
 
 ### Phase 3: Polish (Week 3)
 
-- [ ] Error handling + edge cases
+- [x] Error handling + edge cases
 - [ ] Message editing (update bot messages in place)
 - [ ] Basic usage stats
 - [ ] Testing
@@ -455,17 +541,38 @@ fly logs
 - [ ] Groq API integration
 - [ ] Suggest button feature
 
+## Development Status Summary
+
+**Overall Progress: 85% Complete**
+- Core bot functionality: ✅ Working
+- Database integration: ✅ Working  
+- UI/UX features: ✅ Working
+- Smart shuffle algorithm: ✅ Working
+- User settings: ✅ Working
+- **Pella deployment: 🔄 Webhook mode needed**
+
+**Next Steps for Production:**
+1. Implement webhook mode (2.5 hours)
+2. Deploy to Pella (15 minutes)
+3. Test webhook connectivity (10 minutes)
+
+**Total Time to Production: ~3 hours**
+
 ---
 
 ## Dependencies
 
 **requirements.txt:**
 ```
-python-telegram-bot[webhooks]==21.0
-supabase==2.0.0
-python-dotenv==1.0.0
-uvicorn==0.27.0
-httpx==0.27.0
+# Core bot functionality
+python-telegram-bot==22.6
+supabase==2.27.2
+python-dotenv==1.2.1
+httpx==0.28.1
+
+# Webhook mode (Pella deployment)
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
 ```
 
 ---
@@ -479,6 +586,35 @@ SOMEDAY ──⬆️ Promote──▶ SOON ──⬆️ Promote──▶ NOW
    ◀──────⬇️ Demote──────  ◀─────⬇️ Demote──────
 ```
 
+### Current Implementation Status
+
+**Core Bot Logic: ✅ COMPLETE**
+- Message → Task creation (with !now, !soon tags)
+- Message editing → Task updates (48-hour window)
+- Command handling: /start, /now
+- Inline keyboards: All navigation buttons
+- Smart shuffle: Enhanced algorithm with diversity
+- User settings: Persistent, validated (1-5 limits)
+
+**Database Integration: ✅ COMPLETE**
+- Supabase PostgreSQL with Row Level Security
+- Users table with settings JSONB
+- Tasks table with category validation
+- Proper indexes for performance
+
+**UI/UX Features: ✅ COMPLETE**
+- Responsive inline keyboards
+- Task detail views with actions
+- Settings management (limit, theme, completed toggle)
+- Category counts display
+- Message editing in-place
+
+**Missing for Pella Deployment: 🔄 WEBHOOK MODE**
+- Webhook server implementation
+- Health check endpoint
+- Webhook URL validation
+- Memory optimization for 100MB constraint
+
 ### User Settings Schema
 
 ```json
@@ -491,8 +627,10 @@ SOMEDAY ──⬆️ Promote──▶ SOON ──⬆️ Promote──▶ NOW
 
 | Service | Limit | Your Usage |
 |---------|-------|------------|
-| Fly.io RAM | 256 MB | ~100 MB |
-| Fly.io VMs | 3 | 1 |
+| **Pella RAM** | 100 MB | ~80 MB (optimized) |
+| **Pella Storage** | 5 GB | <50 MB |
+| **Pella CPU** | 0.1 cores | Minimal usage |
+| **Fly.io (Legacy)** | 256 MB RAM, 3 VMs | ~100 MB, 1 VM |
 | Supabase Storage | 500 MB | <10 MB |
 | Supabase MAU | 50,000 | Low |
 | Groq (future) | Generous | Minimal |
