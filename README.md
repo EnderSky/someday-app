@@ -26,7 +26,7 @@ Someday App is a minimalist task management bot designed to reduce overwhelm and
 
 ## Tech Stack
 
-- **Bot Backend**: Python on Fly.io
+- **Bot Backend**: Python, Oracle Cloud
 - **Database**: Supabase (PostgreSQL)
 - **Future**: Web app (Vercel), AI integration (Groq)
 
@@ -37,6 +37,7 @@ Someday App is a minimalist task management bot designed to reduce overwhelm and
 - Python 3.11+
 - Telegram Bot Token (from [@BotFather](https://t.me/botfather))
 - Supabase account
+- Oracle Cloud account
 
 ### Installation
 
@@ -87,7 +88,7 @@ Edit your original message within 48 hours to update the task content.
 - Pagination buttons (← Prev / Next →) appear when lists exceed 10 items
 - Access Settings to customize your experience
 
-## Documentation
+## Implementation
 
 See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for detailed implementation plan.
 

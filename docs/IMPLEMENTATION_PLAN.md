@@ -199,25 +199,55 @@ someday-app/
 
 ## Deployment
 
-**Why Oracle Cloud:**
-- **Robust Free Tier**: 24GB RAM, 200GB storage, 4 ARM cores
-- **Full VM Control**: Complete root access and custom configuration
-- **Enterprise Infrastructure**: Oracle's global cloud with 99.99% uptime
-- **Scaling Ready**: Can handle growth without migration
-- **No Platform Lock-in**: Standard Docker/Linux environment
+**Recommended: Oracle Cloud Container Instances (OCI CI, 2024+)**
+- Zero server maintenance, managed networking, seamless Docker image deployment
+- Modern, scalable, secure: official Oracle docs/release notes [here](https://www.oracle.com/cloud/cloud-native/container-instances/)
 
-#### Oracle Cloud Deployment Steps
+**Concise Steps:**
 1. Sign up at [cloud.oracle.com](https://cloud.oracle.com) (credit card required for verification)
-2. Create Always Free resources:
-   - Ampere A1 compute instance (4 cores, 24GB RAM)
-   - 200GB block storage
-   - Load balancer with public IP
-3. Deploy with Docker:
-   `docker build -t someday-app .`
-   `docker run -d -p 8080:8080 someday-app`
-4. Configure firewall rules for port 8080
-5. Set webhook URL in BotFather to Oracle Cloud endpoint
-6. Deploy with health checks and auto-restart policies
+2. Build Docker image:
+   ```sh
+   docker build -t someday-bot:latest .
+   ```
+3. Push to Oracle Container Registry (OCIR):
+   - [Set up OCIR auth](https://docs.oracle.com/en-us/iaas/Content/Registry/Tasks/registrygettingauthtoken.htm)
+   - Login to Docker: `docker login <region-key>.ocir.io`
+     - Username: `<tenancy-namespace>/<username>`
+     - Password: `<generated-authtoken>`
+   - Tag and push:
+     ```sh
+     docker tag someday-bot:latest <region-key>.ocir.io/<tenancy-namespace>/<repo>:latest
+     docker push <region-key>.ocir.io/<tenancy-namespace>/<repo>:latest
+     ```
+4. In OCI Console → Cloud Native → Container Instances:
+   - Click "Create Container Instance"
+   - Enter OCIR image URI
+   - Inject env vars directly (TELEGRAM_BOT_TOKEN, SUPABASE_*, etc)
+   - Pick shape (RAM/CPU), enable public networking as needed
+   - Set restart policy to "always" for reliability
+5. (Optional) Configure webhook URL in BotFather pointing to your container's public endpoint if using webhooks
+6. Monitor/container logs via OCI Console; scale/upsize as needed
+
+---
+
+**Legacy (VM-Based) Instructions:**
+- Still valid for advanced/self-managed scenarios
+- Requires custom firewall, VM, and load balancer setup
+
+1. Create Always Free compute instance (Ampere A1), block storage, load balancer
+2. Deploy/image/run Docker manually
+3. Configure firewall, webhooks, health checks
+
+---
+
+**Tip:**
+- Use OCI's managed env var injection for secrets
+- Outbound internet is required for Supabase and Telegram API
+
+**References:**
+- [OCI Container Instances Overview](https://www.oracle.com/cloud/cloud-native/container-instances/)
+- [Container Registry Setup](https://docs.oracle.com/en-us/iaas/Content/Registry/Tasks/registrygettingauthtoken.htm)
+- [Bot webhook docs](https://core.telegram.org/bots/api#getting-updates)
 
 
 **Dockerfile:**
