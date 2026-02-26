@@ -37,9 +37,9 @@ Someday App is a minimalist task management bot designed to reduce overwhelm and
 - Python 3.11+
 - Telegram Bot Token (from [@BotFather](https://t.me/botfather))
 - Supabase account
-- Oracle Cloud account
+- Oracle Cloud account (for Cloud deployment)
 
-### Installation
+### Installation & Local Setup
 
 1. Clone the repository
 2. Create a virtual environment:
@@ -88,9 +88,43 @@ Edit your original message within 48 hours to update the task content.
 - Pagination buttons (← Prev / Next →) appear when lists exceed 10 items
 - Access Settings to customize your experience
 
-## Implementation
+## Implementation & Deployment
 
-See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for detailed implementation plan.
+See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for detailed implementation and deployment plan.
+
+## Project Structure
+
+```
+someday-app/
+├── bot/
+│   ├── __init__.py
+│   ├── main.py                    # Entry point, webhook/polling modes
+│   ├── webhook_server.py           # FastAPI webhook server (production)
+│   ├── handlers/
+│   │   ├── __init__.py
+│   │   ├── commands.py            # /start, /now commands
+│   │   ├── callbacks.py           # Inline button handlers
+│   │   └── messages.py            # Free-form message + edited_message handling
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── task_service.py        # CRUD operations, category management
+│   │   ├── user_service.py        # User settings management
+│   │   └── shuffle_service.py     # Smart shuffle logic
+│   ├── db/
+│   │   ├── __init__.py
+│   │   └── supabase_client.py   # Supabase connection + queries
+│   └── utils/
+│       ├── __init__.py
+│       ├── keyboards.py            # Inline keyboard builders
+│       └── formatters.py           # Message formatting helpers
+├── config/
+│   └── settings.py                 # Environment variables, webhook validation
+├── docs/
+│   └── IMPLEMENTATION_PLAN.md   # Implementation guide
+├── requirements.txt               # Python dependencies (FastAPI ready)
+├── Dockerfile                    # Container configuration
+└── .env.example                  # Environment variable template
+```
 
 ## License
 
